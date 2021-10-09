@@ -26,6 +26,45 @@ if ($is_share) {
 if (!$iframed) {
     require_once Ui::find_template('show_html5_player_headers.inc.php');
 }
+
+$solutions = array();
+if (AmpConfig::get('webplayer_html5')) {
+    $solutions[] = 'html';
+}
+if (AmpConfig::get('webplayer_flash')) {
+    $solutions[] = 'flash';
+}
+if (AmpConfig::get('webplayer_aurora')) {
+    $solutions[] = 'aurora';
+}
+
+$supplied = WebPlayer::get_supplied_types($playlist);
+
+$sizeWidth  = '';
+$sizeHeight = '';
+$cssClass   = '';
+
+if ($isVideo) {
+    $cssClass = "jp-video-360p";
+
+    if ($iframed) {
+        $sizeWidth = "640px";
+    } else {
+        $sizeWidth  = "192px";
+        $sizeHeight = "108px";
+    }
+} elseif ($isRadio) {
+    // No size
+} else {
+    if ($iframed) {
+        $sizeWidth  = "80px";
+        $sizeHeight = "80px";
+    } else {
+        $sizeWidth  = "200px";
+        $sizeHeight = "auto";
+    }
+}
+
 $prev       = T_('Previous');
 $play       = T_('Play');
 $pause      = T_('Pause');
@@ -41,6 +80,30 @@ $shuffleoff = T_('Shuffle Off');
 $repeaton   = T_('Repeat');
 $repeatoff  = T_('Repeat Off'); ?>
 <script>
+// Make PHP variables accessible for Javascript
+var cfg = {
+    web_path: <?php echo json_encode(AmpConfig::get('web_path')) ?>,
+    autoplay: <?php echo json_encode((bool)$autoplay) ?>,
+    auroraFormats: "<?php echo (AmpConfig::get('webplayer_aurora')) ? 'flac, m4a, mp3, oga, wav' : '' ?>",
+    size: {
+        width: "<?php echo $sizeWidth ?>",
+        height: "<?php echo $sizeHeight ?>"
+    },
+    cssClass: "<?php echo $cssClass ?>",
+    iframed: <?php echo json_encode((bool)$iframed) ?>,
+    isVideo: <?php echo json_encode((bool)$isVideo) ?>,
+    isRadio: <?php echo json_encode((bool)$isRadio) ?>,
+    is_share: <?php echo json_encode((bool)$is_share) ?>,
+    webplayer_confirmclose: <?php echo json_encode((bool)AmpConfig::get('webplayer_confirmclose')) ?>,
+    browser_notify: <?php echo json_encode((bool)AmpConfig::get('browser_notify')) ?>,
+    sociable: <?php echo json_encode((bool)AmpConfig::get('sociable')) ?>,
+    use_auth: <?php echo json_encode((bool)AmpConfig::get('use_auth')) ?>,
+    song_page_title: <?php echo json_encode((bool)AmpConfig::get('song_page_title')) ?>,
+    waveform: <?php echo json_encode((bool)AmpConfig::get('waveform')) ?>,
+    show_lyrics: <?php echo json_encode((bool)AmpConfig::get('show_lyrics')); ?>,
+    accessCheck25: <?php echo json_encode(Access::check('interface', 25)) ?>
+};
+
 // The web player identifier. We currently use current date milliseconds as unique identifier.
 var jpuqid = (new Date()).getMilliseconds();
 var jplaylist = null;
@@ -51,11 +114,7 @@ var currentAudioElement = undefined;
 
     $(document).ready(function(){
 
-        if (!isNaN(Cookies.get('jp_volume'))) {
-            var jp_volume = Cookies.get('jp_volume');
-        } else {
-            var jp_volume = 0.80;
-        }
+        var jp_volume = (!isNaN(Cookies.get('jp_volume'))) ? Cookies.get('jp_volume') : 0.80;
 
         var replaygainPersist = Cookies.get('replaygain');
 
@@ -64,7 +123,7 @@ var currentAudioElement = undefined;
             cssSelectorAncestor: "#jp_container_1"
         }, [], {
             playlistOptions: {
-                autoPlay: <?php echo ($autoplay) ? 'true' : 'false'; ?>,
+                autoPlay: cfg.autoplay,
                 loopOnPrevious: false,
                 shuffleOnLoop: true,
                 enableRemoveControls: true,
@@ -73,64 +132,20 @@ var currentAudioElement = undefined;
                 removeTime: 'fast',
                 shuffleTime: 'slow'
             },
-            swfPath: "<?php echo $web_path; ?>/lib/vendor/happyworm/jplayer/dist/jplayer",
+            swfPath: cfg.web_path + "/lib/vendor/happyworm/jplayer/dist/jplayer",
             preload: 'auto',
             audioFullScreen: true,
             smoothPlayBar: true,
             toggleDuration: true,
             keyEnabled: true,
-            solution: "<?php
-$solutions = array();
-if (AmpConfig::get('webplayer_html5')) {
-    $solutions[] = 'html';
-}
-if (AmpConfig::get('webplayer_flash')) {
-    $solutions[] = 'flash';
-}
-if (AmpConfig::get('webplayer_aurora')) {
-    $solutions[] = 'aurora';
-}
-echo implode(',', $solutions);
-
-$supplied = WebPlayer::get_supplied_types($playlist); ?>",
+            solution: "<?php echo implode(',', $solutions); ?>",
             nativeSupport:true,
             oggSupport: false,
-            supplied: "<?php echo implode(", ", $supplied); ?>",
+            supplied: "<?php echo implode(', ', $supplied); ?>",
             volume: jp_volume,
-<?php if (AmpConfig::get('webplayer_aurora')) { ?>
-            auroraFormats: 'flac, m4a, mp3, oga, wav',
-<?php
-} ?>
-<?php if (!$is_share) { ?>
-            size: {
-<?php
-if ($isVideo) {
-    if ($iframed) { ?>
-                width: "640px",
-<?php
-            } else { ?>
-                width: "192px",
-                height: "108px",
-<?php
-            } ?>
-                cssClass: "jp-video-360p"
-<?php
-} elseif ($isRadio) {
-                // No size
-            } else {
-                if ($iframed) { ?>
-                width: "80px",
-                height: "80px",
-<?php
-            } else { ?>
-                width: "200px",
-                height: "auto",
-<?php
-            }
-            } ?>
-            }
-<?php
-    } ?>
+            auroraFormats: cfg.auroraFormats,
+            size: cfg.size,
+            cssClass: cfg.cssClass
         });
 
     $("#jquery_jplayer_1").bind($.jPlayer.event.play, function (event) {
@@ -141,10 +156,10 @@ if ($isVideo) {
             playlist = jplaylist.playlist;
         var pos = $(".jp-playlist-current").position().top + $(".jp-playlist").scrollTop();
         $(".jp-playlist").scrollTop(pos);
-<?php if ($iframed && AmpConfig::get('webplayer_confirmclose')) { ?>
-        localStorage.setItem('ampache-current-webplayer', jpuqid);
-<?php
-    } ?>
+
+        if (cfg.iframed && cfg.webplayer_confirmclose) {
+            localStorage.setItem('ampache-current-webplayer', jpuqid);
+        }
 
         var currenti = $(".jp-playlist li").eq(current);
         $.each(playlist, function (index, obj) {
@@ -155,79 +170,81 @@ if ($isVideo) {
                         previousartist = currentjpitem.attr("data-artist_id");
                     }
                     currentjpitem = currenti;
-<?php if ($iframed) { ?>
-                    if (previousartist != currentjpitem.attr("data-artist_id")) {
-                        NotifyOfNewArtist();
+
+                    if (cfg.iframed) {
+                        if (previousartist != currentjpitem.attr("data-artist_id")) {
+                            NotifyOfNewArtist();
+                        }
                     }
-<?php
-    } ?>
-<?php if (AmpConfig::get('browser_notify')) { ?>
-                    NotifyOfNewSong(obj.title, obj.artist, currentjpitem.attr("data-poster"));
-<?php
-    } ?>
+
+                    if (cfg.browser_notify) {
+                        NotifyOfNewSong(obj.title, obj.artist, currentjpitem.attr("data-poster"));
+                    }
+
                     ApplyReplayGain();
                 }
                 if (brkey != '') {
                     sendBroadcastMessage('SONG', currenti.attr("data-media_id"));
                 }
-<?php
-if (!$isVideo && !$isRadio && !$is_share) {
-        if ($iframed) {
-            if (AmpConfig::get('sociable')) {
-                echo "ajaxPut(jsAjaxUrl + '?page=song&action=shouts&object_type=song&object_id=' + currenti.attr('data-media_id'), 'shouts_data');";
-            }
-            echo "ajaxPut(jsAjaxUrl + '?action=action_buttons&object_type=song&object_id=' + currenti.attr('data-media_id'));";
-            echo "var titleobj = '<a href=\"javascript:NavigateTo(\'" . $web_path . "/song.php?action=show_song&song_id=' + currenti.attr('data-media_id') + '\');\" title=\"' + obj.title + '\">' + obj.title + '</a>';";
-            echo "var artistobj = (currenti.attr('data-artist_id') !== 'undefined') ? '<a href=\"javascript:NavigateTo(\'" . $web_path . "/artists.php?action=show&artist=' + currenti.attr('data-artist_id') + '\');\" title=\"' + obj.artist + '\">' + obj.artist + '</a>' : obj.artist;";
-            echo "var lyricsobj = '<a href=\"javascript:NavigateTo(\'" . $web_path . "/song.php?action=show_lyrics&song_id=' + currenti.attr('data-media_id') + '\');\">" . T_('Show Lyrics') . "</a>';";
-            echo "var actionsobj = (currenti.attr('data-album_id') !== 'undefined') ? '<a href=\"javascript:NavigateTo(\'" . $web_path . "/albums.php?action=show&album=' + currenti.attr('data-album_id') + '\');\" title=\"" . T_('Show Album') . "\">" . Ui::get_icon('album', T_('Show Album')) . "</a> |' : '';";
-            if (AmpConfig::get('sociable') && (!AmpConfig::get('use_auth') || Access::check('interface', 25))) {
-                echo "actionsobj += ' <a href=\"javascript:NavigateTo(\'" . $web_path . "/shout.php?action=show_add_shout&type=song&id=' + currenti.attr('data-media_id') + '\');\">" . Ui::get_icon('comment', T_('Post Shout')) . "</a> |';";
-            }
-            echo "actionsobj += '<div id=\'action_buttons\'></div>';";
-            if (AmpConfig::get('waveform') && !$is_share) {
-                echo "var waveformobj = '';";
-                if (AmpConfig::get('sociable') && Access::check('interface', 25)) {
-                    echo "waveformobj += '<a href=\"#\" title=\"" . T_('Double click to post a new shout') . "\" onClick=\"javascript:WaveformClick(' + currenti.attr('data-media_id') + ', ClickTimeOffset(event));\">';";
+
+                if (!cfg.isVideo && !cfg.isRadio && !cfg.is_share) {
+                    if (cfg.iframed) {
+                        if (cfg.sociable) {
+                            ajaxPut(jsAjaxUrl + '?page=song&action=shouts&object_type=song&object_id=' + currenti.attr('data-media_id'), 'shouts_data');
+                        }
+
+                        ajaxPut(jsAjaxUrl + '?action=action_buttons&object_type=song&object_id=' + currenti.attr('data-media_id'));
+                        var titleobj = `<a href="javascript:NavigateTo('${cfg.web_path}/song.php?action=show_song&song_id=${currenti.attr('data-media_id')}');" title="${obj.title}">${obj.title}</a>`;
+                        var artistobj = (currenti.attr('data-artist_id') !== 'undefined') ? `<a href="javascript:NavigateTo('${cfg.web_path}/artists.php?action=show&artist=${currenti.attr('data-artist_id')}');" title="${obj.artist}">${obj.artist}</a>` : obj.artist;
+                        var lyricsobj = `<a href="javascript:NavigateTo('${cfg.web_path}/song.php?action=show_lyrics&song_id=${currenti.attr('data-media_id')});"><?php echo T_('Show Lyrics') ?></a>`;
+                        var actionsobj = (currenti.attr('data-album_id') !== 'undefined') ? `<a href="javascript:NavigateTo('${cfg.web_path}/albums.php?action=show&album=${currenti.attr('data-album_id')}');" title="<?php echo T_('Show Album') ?>"><?php echo Ui::get_icon('album', T_('Show Album')) ?></a> |` : '';
+                        if (cfg.sociable && (!cfg.use_auth || cfg.accessCheck25)) {
+                            actionsobj += ` <a href="javascript:NavigateTo('${cfg.web_path}/shout.php?action=show_add_shout&type=song&id=${currenti.attr('data-media_id')}');"><?php echo Ui::get_icon('comment', T_('Post Shout')) ?></a> |`;
+                        }
+                        actionsobj += `<div id='action_buttons'></div>`;
+                        if (cfg.waveform &&  !cfg.is_share) {
+                            var waveformobj = '';
+                            if (cfg.sociable && cfg.accessCheck25) {
+                                waveformobj += `<a href="#" title="<?php echo T_('Double click to post a new shout') ?>" onClick="javascript:WaveformClick(${currenti.attr('data-media_id')}, ClickTimeOffset(event));">`;
+                            }
+                            waveformobj += `<div class="waveform-shouts"></div>`;
+                            waveformobj += `<div class="waveform-time"></div><img src="${cfg.web_path}/waveform.php?song_id=${currenti.attr('data-media_id')}" onLoad="ShowWaveform();">`;
+                            if (cfg.sociable && cfg.accessCheck25) {
+                                waveformobj += `</a>`;
+                            }
+                        }
+                    } else {
+                        var titleobj = obj.title;
+                        var artistobj = obj.artist;
+                    }
+
+                    $('.playing_title').html(titleobj);
+                    $('.playing_artist').html(artistobj);
+
+                    if (cfg.iframed) {
+                        $('.playing_actions').html(actionsobj);
+
+                        if (cfg.show_lyrics) {
+                            $('.playing_lyrics').html(lyricsobj);
+                        }
+
+                        if (cfg.waveform && !cfg.is_share) {
+                            $('.waveform').html(waveformobj);
+                        }
+                    }
                 }
-                echo "waveformobj += '<div class=\"waveform-shouts\"></div>';";
-                echo "waveformobj += '<div class=\"waveform-time\"></div><img src=\"" . $web_path . "/waveform.php?song_id=' + currenti.attr('data-media_id') + '\" onLoad=\"ShowWaveform();\">';";
-                if (AmpConfig::get('waveform')) {
-                    echo "waveformobj += '</a>';";
+
+                if (cfg.song_page_title && !cfg.is_share) {
+                    var mediaTitle = `${obj.title}\n`;
+                    if (obj.artist !== null) mediaTitle += ` - ${obj.artist}\n`;
+                    document.title = mediaTitle + ` | <?php echo addslashes(AmpConfig::get('site_title')) ?>`;
                 }
-            }
-        } else {
-            echo "var titleobj = obj.title;";
-            echo "var artistobj = obj.artist;";
-        } ?>
-                $('.playing_title').html(titleobj);
-                $('.playing_artist').html(artistobj);
-<?php
-    if ($iframed) { ?>
-                $('.playing_actions').html(actionsobj);
-<?php
-        if (AmpConfig::get('show_lyrics')) { ?>
-                $('.playing_lyrics').html(lyricsobj);
-<?php
-        }
-        if (AmpConfig::get('waveform') && !$is_share) { ?>
-                $('.waveform').html(waveformobj);
-<?php
-        }
-    }
-    }
-if (AmpConfig::get('song_page_title') && !$is_share) {
-    echo "var mediaTitle = obj.title;\n";
-    echo "if (obj.artist !== null) mediaTitle += ' - ' + obj.artist;\n";
-    echo "document.title = mediaTitle + ' | " . addslashes(AmpConfig::get('site_title')) . "';";
-} ?>
             }
         });
-<?php
-    if (AmpConfig::get('waveform') && !$is_share) { ?>
-        HideWaveform();
-<?php
-    } ?>
+
+        if (cfg.waveform && !cfg.is_share) {
+            HideWaveform();
+        }
 
         if (brkey != '') {
             sendBroadcastMessage('PLAYER_PLAY', 1);
@@ -238,23 +255,22 @@ if (AmpConfig::get('song_page_title') && !$is_share) {
         if (brkey != '') {
             sendBroadcastMessage('SONG_POSITION', event.jPlayer.status.currentTime);
         }
-<?php
-    if (AmpConfig::get('waveform') && !$is_share) { ?>
-        var int_position = Math.floor(event.jPlayer.status.currentTime);
-        if (int_position != last_int_position && event.jPlayer.status.currentTime > 0) {
-            last_int_position = int_position;
-            if (shouts[int_position] != undefined) {
-                shouts[int_position].forEach(function(e) {
-                    console.log(e);
-                });
+
+        if (cfg.waveform && !cfg.is_share) {
+            var int_position = Math.floor(event.jPlayer.status.currentTime);
+            if (int_position != last_int_position && event.jPlayer.status.currentTime > 0) {
+                last_int_position = int_position;
+                if (shouts[int_position] != undefined) {
+                    shouts[int_position].forEach(function(e) {
+                        console.log(e);
+                    });
+                }
+            }
+            if (event.jPlayer.status.duration > 0) {
+                var leftpos = 400 * (event.jPlayer.status.currentTime / event.jPlayer.status.duration);
+                $(".waveform-time").css({left: leftpos});
             }
         }
-        if (event.jPlayer.status.duration > 0) {
-            var leftpos = 400 * (event.jPlayer.status.currentTime / event.jPlayer.status.duration);
-            $(".waveform-time").css({left: leftpos});
-        }
-<?php
-    } ?>
     });
 
     $("#jquery_jplayer_1").bind($.jPlayer.event.pause, function (event) {
